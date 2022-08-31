@@ -1,10 +1,15 @@
+from tensorflow.keras.models import Model
+from tensorflow.keras.layers import Input, Conv2D, Dense, GlobalMaxPooling2D
+
+from tensorflow.keras.applications import MobileNetV3Small
+from pre_process import augmented_cut
 import tensorflow as tf
+import tensorflow_addons as tfa
 from keras.models import Model
 from keras.layers import Input, Dense, Dropout, Activation, Flatten
 from keras.layers import Conv2D, MaxPooling2D
 import keras
 import wandb
-from keras.models import Model, load_model
 from keras.utils import plot_model
 import os
 import tensorflow as tf
@@ -12,19 +17,25 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.model_selection import train_test_split
-from pre_process import augmented_cut
+from pre_process import augmented_cut, BB_Metrics
 shape = (256, 256)
-epochs = 10
+epochs = 1
+lr=1e-3
 df = pd.read_csv(r'C:\Users\isaac\PycharmProjects\face_exctraction\dataset_augmentations.csv')
+
 #%%
 for x in range(len(df)):
     row=df.loc[x]
-    top, left, width, height= augmented_cut(row['pic_width'], row['pic_height'], row['top'], row['left'], row['width'], row['height'], .2)
+    top, left, width, height= augmented_cut(row['pic_width'], row['pic_height'], row['top'], row['left'], row['width'], row['height'])
     df['top'].loc[x]=top
     df['left'].loc[x]=left
     df['width'].loc[x]=width
     df['height'].loc[x]=height
 #%%
+x2=df['top']+df['height']
+y2=df['left']+df['width']
+df['width']=x2
+df['height']=y2
 df=df[['path','top','left','width','height','zero','one','many']]
 df['path']=df.apply(lambda row: os.path.join(r'C:\Users\isaac\PycharmProjects\face_exctraction\dlib_face_detection_dataset',row['path']), axis=1)
 #%%
@@ -65,94 +76,66 @@ val = val.map(load_and_preprocess_from_path_label)
 # %%
 filter_size = (5, 5)
 maxpool_size = (2, 2)
-dr = 0.3
+dr = 0.1
 
 inputs = Input(shape=(shape[0], shape[1], 3), name='main_input')
+# MobileNetV3Small(input_shape=(inputs.s),include_top=False, weights='imagenet')(inputs)
+vgg = MobileNetV3Small(include_top=False)(inputs)
+vgg.trainable = False
+#flatten
+flat = Flatten()(vgg)
+classification = Dense(256, activation=tf.keras.layers.LeakyReLU())(flat)
+classification = Dropout(dr)(classification)
+classification = Dense(128, activation=tf.keras.layers.LeakyReLU())(classification)
+classification = Dropout(dr)(classification)
+classification = Dense(64, activation=tf.keras.layers.LeakyReLU())(classification)
+classification = Dense(32, activation=tf.keras.layers.LeakyReLU())(classification)
+classification = Dense(3, activation='softmax')(classification)
 
-main_branch = Conv2D(8, kernel_size=(5, 5), padding="valid")(inputs)
-main_branch = Activation(tf.keras.activations.swish)(main_branch)
-main_branch = MaxPooling2D(pool_size=maxpool_size)(main_branch)
-
-
-main_branch = Conv2D(16, kernel_size=(5, 5), padding="valid")(main_branch)
-main_branch = Activation(tf.keras.activations.swish)(main_branch)
-people_branch=Conv2D(12, kernel_size=(5, 5), padding="valid")(main_branch)
-people_branch = Activation(tf.keras.activations.swish)(people_branch)
-people_branch = MaxPooling2D(pool_size=maxpool_size)(people_branch)
-people_branch=Conv2D(4, kernel_size=(5, 5), padding="valid")(main_branch)
-people_branch = Activation(tf.keras.activations.swish)(people_branch)
-people_branch = MaxPooling2D(pool_size=maxpool_size)(people_branch)
-people_branch=Conv2D(4, kernel_size=(5, 5), padding="valid")(main_branch)
-people_branch = Activation(tf.keras.activations.swish)(people_branch)
-people_branch = MaxPooling2D(pool_size=maxpool_size)(people_branch)
-
-people_branch = Flatten()(people_branch)
-people_branch = Dense(80)(people_branch)
-people_branch = Dropout(dr)(people_branch)
-people_branch = Dense(32)(people_branch)
-people_branch = Dropout(dr)(people_branch)
-people_branch = Dense(16)(people_branch)
-
-
-people_branch = Activation('relu')(people_branch)
-people_branch = Dropout(dr)(people_branch)
-people_branch = Dense(16)(people_branch)
+regression = Dense(256, activation=tf.keras.layers.LeakyReLU())(flat)
+regression = Dropout(dr)(regression)
+regression = Dense(128, activation=tf.keras.layers.LeakyReLU())(regression)
+regression = Dropout(dr)(regression)
+regression = Dense(64, activation=tf.keras.layers.LeakyReLU())(regression)
+regression = Dense(32, activation=tf.keras.layers.LeakyReLU())(regression)
+regression = Dense(16, activation=tf.keras.layers.LeakyReLU())(regression)
+regression = Dense(4, activation=tf.keras.layers.LeakyReLU())(regression)
 
 
 
 
-
-main_branch = Conv2D(12, kernel_size=(5, 5), padding="valid")(main_branch)
-main_branch = Activation(tf.keras.activations.swish)(main_branch)
-main_branch = MaxPooling2D(pool_size=maxpool_size)(main_branch)
-main_branch = Conv2D(8, kernel_size=(3, 3), padding="valid")(main_branch)
-main_branch = Activation(tf.keras.activations.swish)(main_branch)
-main_branch = Conv2D(4, kernel_size=(3, 3), padding="valid")(main_branch)
-main_branch = Activation(tf.keras.activations.swish)(main_branch)
-
-main_branch = MaxPooling2D(pool_size=maxpool_size)(main_branch)
-
-main_branch = Flatten()(main_branch)
-main_branch = Dense(80)(main_branch)
-main_branch = Dropout(dr)(main_branch)
-main_branch = Dense(32)(main_branch)
-main_branch = Dropout(dr)(main_branch)
-main_branch = Dense(16)(main_branch)
-
-
-main_branch = Activation(tf.keras.activations.swish)(main_branch)
-main_branch = Dropout(dr)(main_branch)
-main_branch = Dense(16)(main_branch)
-
-
-land_marks = Dense(4, activation=tf.keras.activations.swish, name='landmarks')(main_branch)
-people_count = Dense(3, activation='softmax', name='people')(people_branch)
 
 model = Model(inputs=inputs,
-              outputs=[land_marks,
-                       people_count])
+              outputs=[regression,
+                       classification])
 model.summary()
+# model.compile(optimizer='rmsprop',
+#               loss={'landmarks': 'mse',
+#                     'people': tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)},
+#               loss_weights={'landmarks': .001,
+#                             'lighting': .001,
+#                             'face_cover': .001,
+#                             'hat': .001,
+#                             'glasses': .001,
+#                             'dark_glasses': .001})
+
+
 
 # %%
-ds = ds.batch(28)
-val = val.batch(28)
-batches_per_epoch = len(ds)
+ds = ds.batch(4)
+val = val.batch(4)
 cat_loss = tf.keras.losses.CategoricalCrossentropy(from_logits=False)
-mse_fn = tf.keras.losses.MeanSquaredError()
-lr= 0.0001
-lr_decay = (1./0.75 -1)/batches_per_epoch
-
-optimizer = tf.keras.optimizers.Adam(learning_rate=0.0001, decay=lr_decay)
-
+giou_loss = tfa.losses.GIoULoss()
+optimizer = tf.keras.optimizers.Adam(learning_rate=lr)
 #%%
-wandb.init(project="preprocessing model",config={"epochs":epochs,"shape":shape,"filter_size":filter_size,"maxpool_size":maxpool_size,"dr":dr,"lr":lr,"lr_decay":lr_decay})
+wandb.init(project="preprocessing model",config={"epochs":epochs,"shape":shape,"filter_size":filter_size,"maxpool_size":maxpool_size,"dr":dr})
 name=wandb.run.name
 wandb.run.name='face _extraction_'+wandb.run.name
 #%%
-val_people_accuracy = tf.keras.metrics.CategoricalAccuracy()
+val_people_accuracy = tfa.losses.GIoULoss()
 train_people_accuracy = tf.keras.metrics.CategoricalAccuracy()
 test_people_accuracy = tf.keras.metrics.CategoricalAccuracy()
-
+bb_metrics=BB_Metrics()
 # %%
 for epoch in range(epochs):
     print("\nStart of epoch %d" % (epoch,))
@@ -168,43 +151,55 @@ for epoch in range(epochs):
             # The operations that the layer applies
             # to its inputs are going to be recorded
             # on the GradientTape.
-
             landmarks,people_count = model(x_batch_train,training=True)  # Logits for this minibatch
             empty= tf.zeros_like(landmarks)
             # Compute the loss value for this minibatch.
             booleans=tf.math.reduce_sum(tf.cast(empty == y_batch_train[0], dtype=tf.float32), axis=1) != 4
             train_slice=tf.boolean_mask(y_batch_train[0],booleans)
             train_landmarks=tf.boolean_mask(landmarks,booleans)
-            landmarks_loss = mse_fn(train_slice, train_landmarks)
+            landmarks_loss = giou_loss(train_slice, train_landmarks)
             categorical_loss = cat_loss(y_batch_train[1], people_count)
             train_people_accuracy(y_batch_train[1], people_count)
+            bb_metrics.update(train_landmarks,train_slice)
+            if step == 0:
+                combined_loss = landmarks_loss
+            else:
+                combined_loss += landmarks_loss
             wandb.log({'landmarks loss': landmarks_loss})
             wandb.log({'categorical loss': categorical_loss})
+            grads = tape.gradient([landmarks_loss,
+                                   categorical_loss],
+                                  model.trainable_weights)
+            # Run one step of gradient descent by updating
+            # the value of the variables to minimize the loss.
+            optimizer.apply_gradients(zip(grads, model.trainable_weights))
 
 
+    wandb.log(bb_metrics.get_metrics('train_BB'))
+    bb_metrics.clear_data()
+    wandb.log({'Train combined loss': combined_loss})
+    wandb.log({'Train accuracy': train_people_accuracy.result()})
 
-
-        grads = tape.gradient([landmarks_loss,
-                               categorical_loss],
-                              model.trainable_weights)
-
-        # Run one step of gradient descent by updating
-        # the value of the variables to minimize the loss.
-        optimizer.apply_gradients(zip(grads, model.trainable_weights))
-    wandb.log({'people accuracy': train_people_accuracy.result()})
     for step, (x_batch_val, y_batch_val) in enumerate(val):
         landmarks, people_count = model(x_batch_val, training=False)
         empty = tf.zeros_like(landmarks)
         booleans = tf.math.reduce_sum(tf.cast(empty == y_batch_val[0], dtype=tf.float32), axis=1) != 4
         train_slice = tf.boolean_mask(y_batch_val[0], booleans)
         train_landmarks = tf.boolean_mask(landmarks, booleans)
-        val_landmarks_loss = mse_fn(train_slice, train_landmarks)
+        val_landmarks_loss = giou_loss(train_slice, train_landmarks)
         val_categorical_loss = cat_loss(y_batch_val[1], people_count)
         val_people_accuracy(y_batch_val[1], people_count)
+        bb_metrics.update(train_landmarks, train_slice)
+        if step  == 0:
+            combined_loss = val_landmarks_loss
+        else:
+            combined_loss += val_landmarks_loss
         wandb.log({'val landmarks loss': val_landmarks_loss,
                    'val  categorical loss': val_categorical_loss})
-    wandb.log({'val people accuracy': val_people_accuracy.result()})
-
+    wandb.log({'Val accuracy': val_people_accuracy.result()})
+    wandb.log({'Combined val loss': combined_loss})
+    wandb.log(bb_metrics.get_metrics('val_BB'))
+    bb_metrics.clear_data()
 
 
     train_people_accuracy.reset_states()
@@ -236,23 +231,25 @@ for step, (x_batch_test, y_batch_test) in enumerate(test):
     class1=np.argmax(people_count)
     correct_class=np.argmax(y_batch_test[1])
     if (correct_class==0 or correct_class==2):
-        ax.imshow(x_batch_test.numpy()[0].astype(int))
+        pass
     else:
+        bb_metrics.update(numpy_landmarks, ground_truth)
         ax.imshow(x_batch_test.numpy()[0].astype(int))
         ax.add_patch(plt.Rectangle((numpy_landmarks[0]*256,numpy_landmarks[1]*256)
                                    ,(numpy_landmarks[2]*256),
                                    (numpy_landmarks[3]*256),fill=False,edgecolor='r',linewidth=3))
+        ax.add_patch(plt.Rectangle((ground_truth[0]*256, ground_truth[1]*256), ground_truth[2]*256 , ground_truth[3]*256 , fill=False, edgecolor='blue', linewidth=3))
         print('hey')
-        test_landmarks_loss += mse_fn(train_slice, train_landmarks)
-        ax.add_patch(plt.Rectangle((ground_truth[0]*256, ground_truth[1]*256), ground_truth[2]*256, ground_truth[3]*256 , fill=False, edgecolor='blue', linewidth=3))
+        test_landmarks_loss += giou_loss(train_slice, train_landmarks)
+
         # fig.show()
     table.add_data(wandb.Image(fig), float(test_landmarks_loss),class1,correct_class,class1==correct_class)
 
 wandb.log({'test landmarks loss': test_landmarks_loss,
             'test categorical loss': test_categorical_loss})
 wandb.log({'test people accuracy': test_people_accuracy.result()})
+wandb.log(bb_metrics.get_metrics('test_BB'))
 #%%
 model.save(r'C:\Users\isaac\PycharmProjects\face_exctraction\models\face_extraction-'+name+'.h5')
 wandb.log({'test table': table})
 wandb.finish()
-print('face_extraction-'+name+'.h5')
