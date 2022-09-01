@@ -12,7 +12,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.model_selection import train_test_split
-from pre_process import augmented_cut
+from pre_process import augmented_cut, BB_Metrics
 shape = (256, 256)
 epochs = 10
 df = pd.read_csv(r'C:\Users\isaac\PycharmProjects\face_exctraction\dataset_augmentations.csv')
@@ -152,7 +152,7 @@ wandb.run.name='face _extraction_'+wandb.run.name
 val_people_accuracy = tf.keras.metrics.CategoricalAccuracy()
 train_people_accuracy = tf.keras.metrics.CategoricalAccuracy()
 test_people_accuracy = tf.keras.metrics.CategoricalAccuracy()
-
+bb_metrics=BB_Metrics()
 # %%
 for epoch in range(epochs):
     print("\nStart of epoch %d" % (epoch,))
@@ -180,18 +180,21 @@ for epoch in range(epochs):
             train_people_accuracy(y_batch_train[1], people_count)
             wandb.log({'landmarks loss': landmarks_loss})
             wandb.log({'categorical loss': categorical_loss})
+            if step == 0:
+                combined_loss = landmarks_loss
+            else:
+                combined_loss += landmarks_loss
+            grads = tape.gradient([landmarks_loss,
+                                   categorical_loss],
+                                  model.trainable_weights)
+            # Run one step of gradient descent by updating
+            # the value of the variables to minimize the loss.
+            optimizer.apply_gradients(zip(grads, model.trainable_weights))
 
-
-
-
-        grads = tape.gradient([landmarks_loss,
-                               categorical_loss],
-                              model.trainable_weights)
-
-        # Run one step of gradient descent by updating
-        # the value of the variables to minimize the loss.
-        optimizer.apply_gradients(zip(grads, model.trainable_weights))
-    wandb.log({'people accuracy': train_people_accuracy.result()})
+    wandb.log(bb_metrics.get_metrics('train_BB'))
+    bb_metrics.clear_data()
+    wandb.log({'Train combined loss': combined_loss})
+    wandb.log({'Train accuracy': train_people_accuracy.result()})
     for step, (x_batch_val, y_batch_val) in enumerate(val):
         landmarks, people_count = model(x_batch_val, training=False)
         empty = tf.zeros_like(landmarks)
@@ -201,28 +204,26 @@ for epoch in range(epochs):
         val_landmarks_loss = mse_fn(train_slice, train_landmarks)
         val_categorical_loss = cat_loss(y_batch_val[1], people_count)
         val_people_accuracy(y_batch_val[1], people_count)
+        if step  == 0:
+            combined_loss = val_landmarks_loss
+        else:
+            combined_loss += val_landmarks_loss
         wandb.log({'val landmarks loss': val_landmarks_loss,
                    'val  categorical loss': val_categorical_loss})
-    wandb.log({'val people accuracy': val_people_accuracy.result()})
-
-
+    wandb.log({'Val accuracy': val_people_accuracy.result()})
+    wandb.log({'Combined val loss': combined_loss})
+    wandb.log(bb_metrics.get_metrics('val_BB'))
 
     train_people_accuracy.reset_states()
     val_people_accuracy.reset_states()
 model.save(r'C:\Users\isaac\PycharmProjects\face_exctraction\face_extraction-'+name+'.h5')
-#%%
-# wandb.init(project="preprocessing model", resume=True)
-#hot encode poeple
-
-
-# %%
-
 #%%
 test = tf.data.Dataset.from_tensor_slices((test_filenames, test_labels))
 test = test.map(load_and_preprocess_from_path_label)
 test=test.batch(1)
 test_landmarks_loss=0
 test_categorical_loss=0
+bb_metrics=BB_Metrics()
 table = wandb.Table(columns=['picture', 'landmarks loss', 'Class','Correct class','Accurately classified'])
 for step, (x_batch_test, y_batch_test) in enumerate(test):
     landmarks, people_count = model(x_batch_test, training=False)
@@ -238,19 +239,22 @@ for step, (x_batch_test, y_batch_test) in enumerate(test):
     if (correct_class==0 or correct_class==2):
         ax.imshow(x_batch_test.numpy()[0].astype(int))
     else:
+        bb_metrics.update(numpy_landmarks.reshape(1,4), ground_truth.reshape(1,4))
         ax.imshow(x_batch_test.numpy()[0].astype(int))
         ax.add_patch(plt.Rectangle((numpy_landmarks[0]*256,numpy_landmarks[1]*256)
                                    ,(numpy_landmarks[2]*256),
                                    (numpy_landmarks[3]*256),fill=False,edgecolor='r',linewidth=3))
-        print('hey')
+        ax.add_patch(plt.Rectangle((ground_truth[0]*256, ground_truth[1]*256), ground_truth[2]*256 , ground_truth[3]*256 , fill=False, edgecolor='blue', linewidth=3))
+        print('testing step:',step)
         test_landmarks_loss += mse_fn(train_slice, train_landmarks)
-        ax.add_patch(plt.Rectangle((ground_truth[0]*256, ground_truth[1]*256), ground_truth[2]*256, ground_truth[3]*256 , fill=False, edgecolor='blue', linewidth=3))
+
         # fig.show()
     table.add_data(wandb.Image(fig), float(test_landmarks_loss),class1,correct_class,class1==correct_class)
 
 wandb.log({'test landmarks loss': test_landmarks_loss,
             'test categorical loss': test_categorical_loss})
 wandb.log({'test people accuracy': test_people_accuracy.result()})
+wandb.log(bb_metrics.get_metrics('test_BB'))
 #%%
 model.save(r'C:\Users\isaac\PycharmProjects\face_exctraction\models\face_extraction-'+name+'.h5')
 wandb.log({'test table': table})

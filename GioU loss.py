@@ -19,7 +19,7 @@ import numpy as np
 from sklearn.model_selection import train_test_split
 from pre_process import augmented_cut, BB_Metrics
 shape = (256, 256)
-epochs = 1
+epochs = 10
 lr=1e-3
 df = pd.read_csv(r'C:\Users\isaac\PycharmProjects\face_exctraction\dataset_augmentations.csv')
 
@@ -132,7 +132,7 @@ wandb.init(project="preprocessing model",config={"epochs":epochs,"shape":shape,"
 name=wandb.run.name
 wandb.run.name='face _extraction_'+wandb.run.name
 #%%
-val_people_accuracy = tfa.losses.GIoULoss()
+val_people_accuracy = tf.keras.metrics.CategoricalAccuracy()
 train_people_accuracy = tf.keras.metrics.CategoricalAccuracy()
 test_people_accuracy = tf.keras.metrics.CategoricalAccuracy()
 bb_metrics=BB_Metrics()
@@ -142,7 +142,7 @@ for epoch in range(epochs):
     # Iterate over the batches of the dataset.
     for step, (x_batch_train, y_batch_train) in enumerate(ds):
         # Open a GradientTape to record the operations run
-        print("\nStart of iteration %d" % (step,))
+        print("Start of iteration %d" % (step,))
         # during the forward pass, which enables auto-differentiation.
         with tf.GradientTape() as tape:
             tape.watch(x_batch_train)
@@ -160,7 +160,7 @@ for epoch in range(epochs):
             landmarks_loss = giou_loss(train_slice, train_landmarks)
             categorical_loss = cat_loss(y_batch_train[1], people_count)
             train_people_accuracy(y_batch_train[1], people_count)
-            bb_metrics.update(train_landmarks,train_slice)
+            bb_metrics.update(train_landmarks.numpy(),train_slice.numpy())
             if step == 0:
                 combined_loss = landmarks_loss
             else:
@@ -181,6 +181,7 @@ for epoch in range(epochs):
     wandb.log({'Train accuracy': train_people_accuracy.result()})
 
     for step, (x_batch_val, y_batch_val) in enumerate(val):
+        print("Start of val %d" % (step,))
         landmarks, people_count = model(x_batch_val, training=False)
         empty = tf.zeros_like(landmarks)
         booleans = tf.math.reduce_sum(tf.cast(empty == y_batch_val[0], dtype=tf.float32), axis=1) != 4
@@ -189,7 +190,7 @@ for epoch in range(epochs):
         val_landmarks_loss = giou_loss(train_slice, train_landmarks)
         val_categorical_loss = cat_loss(y_batch_val[1], people_count)
         val_people_accuracy(y_batch_val[1], people_count)
-        bb_metrics.update(train_landmarks, train_slice)
+        bb_metrics.update(train_landmarks.numpy(), train_slice.numpy())
         if step  == 0:
             combined_loss = val_landmarks_loss
         else:
@@ -218,6 +219,7 @@ test = test.map(load_and_preprocess_from_path_label)
 test=test.batch(1)
 test_landmarks_loss=0
 test_categorical_loss=0
+bb_metrics=BB_Metrics()
 table = wandb.Table(columns=['picture', 'landmarks loss', 'Class','Correct class','Accurately classified'])
 for step, (x_batch_test, y_batch_test) in enumerate(test):
     landmarks, people_count = model(x_batch_test, training=False)
@@ -233,13 +235,13 @@ for step, (x_batch_test, y_batch_test) in enumerate(test):
     if (correct_class==0 or correct_class==2):
         pass
     else:
-        bb_metrics.update(numpy_landmarks, ground_truth)
+        bb_metrics.update(numpy_landmarks.reshape(1,4), ground_truth.reshape(1,4))
         ax.imshow(x_batch_test.numpy()[0].astype(int))
         ax.add_patch(plt.Rectangle((numpy_landmarks[0]*256,numpy_landmarks[1]*256)
                                    ,(numpy_landmarks[2]*256),
                                    (numpy_landmarks[3]*256),fill=False,edgecolor='r',linewidth=3))
         ax.add_patch(plt.Rectangle((ground_truth[0]*256, ground_truth[1]*256), ground_truth[2]*256 , ground_truth[3]*256 , fill=False, edgecolor='blue', linewidth=3))
-        print('hey')
+        print('testing step:',step)
         test_landmarks_loss += giou_loss(train_slice, train_landmarks)
 
         # fig.show()
