@@ -20,7 +20,7 @@ from pre_process import augmented_cut, BB_Metrics
 shape = (256, 256)
 epochs = 10
 lr=1e-3
-df = pd.read_csv(r'C:\Users\isaac\PycharmProjects\face_exctraction\dataset_augmentations.csv')
+df = pd.read_csv(r'C:\Users\isaac\PycharmProjects\face_exctraction\dataset1.csv')
 
 #%%
 for x in range(len(df)):
@@ -78,10 +78,15 @@ dr = 0.1
 inputs = Input(shape=(shape[0], shape[1], 3), name='main_input')
 # MobileNetV3Small(input_shape=(inputs.s),include_top=False, weights='imagenet')(inputs)
 vgg = MobileNetV3Small(include_top=False)(inputs)
+#[4, 8, 8, 576]
 vgg.trainable = False
 #flatten
-flat = Flatten()(vgg)
-classification = Dense(256, activation=tf.keras.layers.LeakyReLU())(flat)
+
+classification = Conv2D(180, kernel_size=(5, 5), padding="valid")(vgg)
+classification = Activation("LeakyReLU")(classification)
+classification = MaxPooling2D(pool_size=(2, 2))(classification)
+classification = Flatten()(classification)
+classification = Dense(256, activation=tf.keras.layers.LeakyReLU())(classification)
 classification = Dropout(dr)(classification)
 classification = Dense(128, activation=tf.keras.layers.LeakyReLU())(classification)
 classification = Dropout(dr)(classification)
@@ -89,7 +94,11 @@ classification = Dense(64, activation=tf.keras.layers.LeakyReLU())(classificatio
 classification = Dense(32, activation=tf.keras.layers.LeakyReLU())(classification)
 classification = Dense(3, activation='softmax')(classification)
 
-regression = Dense(256, activation=tf.keras.layers.LeakyReLU())(flat)
+regression = Conv2D(180, kernel_size=(5, 5), padding="valid")(vgg)
+regression = Activation("LeakyReLU")(regression)
+regression = MaxPooling2D(pool_size=(2, 2))(regression)
+regression = Flatten()(regression)
+regression = Dense(256, activation=tf.keras.layers.LeakyReLU())(regression)
 regression = Dropout(dr)(regression)
 regression = Dense(128, activation=tf.keras.layers.LeakyReLU())(regression)
 regression = Dropout(dr)(regression)
@@ -115,7 +124,8 @@ cat_loss = tf.keras.losses.CategoricalCrossentropy(from_logits=False)
 mse_fn = tf.keras.losses.MeanSquaredError()
 optimizer = tf.keras.optimizers.Adam(learning_rate=lr)
 #%%
-wandb.init(project="preprocessing model",config={"epochs":epochs,"shape":shape,"filter_size":filter_size,"maxpool_size":maxpool_size,"dr":dr})
+wandb.init(project="preprocessing model1",config={"epochs":epochs,"shape":shape,"filter_size":filter_size,"maxpool_size":maxpool_size,"dr":dr
+                                                  ,"dataset":'unagumented'})
 name=wandb.run.name
 wandb.run.name='face _extraction_'+wandb.run.name
 #%%

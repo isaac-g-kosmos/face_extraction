@@ -47,7 +47,7 @@ for x in range(len(df)):
 #%%
 # model=load_model(r'C:\Users\isaac\PycharmProjects\face_exctraction\face_extraction-firm-serenity-58.h5')
 # model=load_model(r'/models/face_extraction-olive-plant-66.h5')
-model=load_model(r'C:\Users\isaac\PycharmProjects\face_exctraction\face_extraction-sandy-brook-81.h5')
+model=load_model(r'C:\Users\isaac\PycharmProjects\face_exctraction\models\face_extraction-treasured-wildflower-83.h5')
 model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
 # model=load_model(r'C:\Users\isaac\PycharmProjects\face_exctraction\face_extraction-distinctive-pyramid-73.h5')
 # model=load_model(r'C:\Users\isaac\PycharmProjects\face_exctraction\face_extraction-frosty-moon-68.h5')
@@ -100,9 +100,9 @@ image=image.resize((256,256))
 image=np.array(image)
 ax.imshow(image)
 
-ax.add_patch(plt.Rectangle((landmarks[1],landmarks[0]),landmarks[2],landmarks[3],fill=False,edgecolor='blue',linewidth=3))
-plt.show()
-#
-# slice=image[int(landmarks[0]):int(landmarks[0])+int(landmarks[3]),int(landmarks[1]):int(landmarks[1])+int(landmarks[2])]
-# plt.imshow(slice)
+# ax.add_patch(plt.Rectangle((landmarks[1],landmarks[0]),landmarks[2],landmarks[3],fill=False,edgecolor='blue',linewidth=3))
 # plt.show()
+#
+slice=image[int(landmarks[0]):int(landmarks[0])+int(landmarks[3]),int(landmarks[1]):int(landmarks[1])+int(landmarks[2])]
+plt.imshow(slice)
+plt.show()

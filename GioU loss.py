@@ -1,6 +1,6 @@
 from tensorflow.keras.models import Model
 from tensorflow.keras.layers import Input, Conv2D, Dense, GlobalMaxPooling2D
-
+from tensorflow_addons.losses import GIoULoss
 from tensorflow.keras.applications import MobileNetV3Small
 from pre_process import augmented_cut
 import tensorflow as tf
@@ -127,10 +127,10 @@ val = val.batch(4)
 cat_loss = tf.keras.losses.CategoricalCrossentropy(from_logits=False)
 giou_loss = tfa.losses.GIoULoss()
 optimizer = tf.keras.optimizers.Adam(learning_rate=lr)
-#%%
-wandb.init(project="preprocessing model",config={"epochs":epochs,"shape":shape,"filter_size":filter_size,"maxpool_size":maxpool_size,"dr":dr})
-name=wandb.run.name
-wandb.run.name='face _extraction_'+wandb.run.name
+# #%%
+# wandb.init(project="preprocessing model",config={"epochs":epochs,"shape":shape,"filter_size":filter_size,"maxpool_size":maxpool_size,"dr":dr})
+# name=wandb.run.name
+# wandb.run.name='face _extraction_'+wandb.run.name
 #%%
 val_people_accuracy = tf.keras.metrics.CategoricalAccuracy()
 train_people_accuracy = tf.keras.metrics.CategoricalAccuracy()
