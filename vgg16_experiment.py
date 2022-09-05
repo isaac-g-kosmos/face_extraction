@@ -18,9 +18,9 @@ import numpy as np
 from sklearn.model_selection import train_test_split
 from pre_process import augmented_cut, BB_Metrics
 shape = (256, 256)
-epochs = 10
-lr=1e-3
-df = pd.read_csv(r'C:\Users\isaac\PycharmProjects\face_exctraction\dataset1.csv')
+epochs = 20
+lr=5e-4
+df = pd.read_csv(r'/home/ubuntu/face_extraction/dataset_augmentations_linux.csv')
 
 #%%
 for x in range(len(df)):
@@ -32,7 +32,7 @@ for x in range(len(df)):
     df['height'].loc[x]=height
 #%%
 df=df[['path','top','left','width','height','zero','one','many']]
-df['path']=df.apply(lambda row: os.path.join(r'C:\Users\isaac\PycharmProjects\face_exctraction\dlib_face_detection_dataset',row['path']), axis=1)
+df['path']=df.apply(lambda row: os.path.join(r'/home/ubuntu/face_extraction/dlib_face_detection_dataset',row['path']), axis=1)
 #%
 # split the data into train and test
 ###separe into train test and validation
@@ -63,9 +63,6 @@ def load_and_preprocess_from_path_label(path, label):
 ds = tf.data.Dataset.from_tensor_slices((filenames, labels), )
 
 #%%
-# The tuples are unpacked into the positional arguments of the mapped function
-
-
 ds = ds.map(load_and_preprocess_from_path_label)
 val = tf.data.Dataset.from_tensor_slices((val_filenames, val_labels))
 val = val.map(load_and_preprocess_from_path_label)
@@ -73,7 +70,7 @@ val = val.map(load_and_preprocess_from_path_label)
 # %%
 filter_size = (5, 5)
 maxpool_size = (2, 2)
-dr = 0.1
+dr = 0.15
 
 inputs = Input(shape=(shape[0], shape[1], 3), name='main_input')
 # MobileNetV3Small(input_shape=(inputs.s),include_top=False, weights='imagenet')(inputs)
@@ -91,7 +88,9 @@ classification = Dropout(dr)(classification)
 classification = Dense(128, activation=tf.keras.layers.LeakyReLU())(classification)
 classification = Dropout(dr)(classification)
 classification = Dense(64, activation=tf.keras.layers.LeakyReLU())(classification)
+classification = Dropout(dr)(classification)
 classification = Dense(32, activation=tf.keras.layers.LeakyReLU())(classification)
+classification = Dropout(dr)(classification)
 classification = Dense(3, activation='softmax')(classification)
 
 regression = Conv2D(180, kernel_size=(5, 5), padding="valid")(vgg)
@@ -103,9 +102,12 @@ regression = Dropout(dr)(regression)
 regression = Dense(128, activation=tf.keras.layers.LeakyReLU())(regression)
 regression = Dropout(dr)(regression)
 regression = Dense(64, activation=tf.keras.layers.LeakyReLU())(regression)
+regression = Dropout(dr)(regression)
 regression = Dense(32, activation=tf.keras.layers.LeakyReLU())(regression)
+regression = Dropout(dr)(regression)
 regression = Dense(16, activation=tf.keras.layers.LeakyReLU())(regression)
 regression = Dense(4, activation=tf.keras.layers.LeakyReLU())(regression)
+
 
 
 
@@ -118,10 +120,10 @@ model.summary()
 
 
 # %%
-ds = ds.batch(4)
-val = val.batch(4)
+ds = ds.batch(10)
+val = val.batch(10)
 cat_loss = tf.keras.losses.CategoricalCrossentropy(from_logits=False)
-mse_fn = tf.keras.losses.MeanSquaredError()
+mse_fn =tf.keras.losses.Huber ()
 optimizer = tf.keras.optimizers.Adam(learning_rate=lr)
 #%%
 wandb.init(project="preprocessing model1",config={"epochs":epochs,"shape":shape,"filter_size":filter_size,"maxpool_size":maxpool_size,"dr":dr
@@ -201,7 +203,7 @@ for epoch in range(epochs):
 
     train_people_accuracy.reset_states()
     val_people_accuracy.reset_states()
-model.save(r'C:\Users\isaac\PycharmProjects\face_exctraction\face_extraction-'+name+'.h5')
+model.save(r'/home/ubuntu/face_extraction/models/face_extraction-'+name+'.h5')
 #%%
 # wandb.init(project="preprocessing model", resume=True)
 #hot encode poeple
@@ -249,7 +251,7 @@ wandb.log({'test landmarks loss': test_landmarks_loss,
 wandb.log({'test people accuracy': test_people_accuracy.result()})
 wandb.log(bb_metrics.get_metrics('test_BB'))
 #%%
-model.save(r'C:\Users\isaac\PycharmProjects\face_exctraction\models\face_extraction-'+name+'.h5')
-wandb.log({'test table': table})
+model.save(r'home/ubuntu/face_extraction/models/face_extraction-'+name+'.h5')
+# wandb.log({'test table': table})
 wandb.finish()
-print(r'C:\Users\isaac\PycharmProjects\face_exctraction\models\face_extraction-'+name+'.h5')
+print(r'home/ubuntu/face_extraction/models/face_extraction-'+name+'.h5')

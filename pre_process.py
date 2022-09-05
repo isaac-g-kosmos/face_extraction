@@ -2,7 +2,6 @@ import numpy as np
 
 from PIL import Image
 import tensorflow as tf
-import albumentations as alb
 
 
 def augmented_cut(pic_width, pic_height, top, left, width, height, leeway=0):
@@ -70,7 +69,10 @@ def bb_box_metrics(pred,label):
     accuracy=intersection/union
     presicion=intersection/pred[2]*pred[3]
     recall=intersection/label[2]*label[3]
-    f1_score=2*presicion*recall/(presicion+recall)
+    if (presicion+recall)==0:
+        f1_score=0
+    else:
+        f1_score=2*presicion*recall/(presicion+recall)
     IoU=intersection/union
     return accuracy,presicion,recall,f1_score, IoU
 def bb_box_metrics_extension(pred,label):
@@ -90,7 +92,10 @@ def bb_box_metrics_extension(pred,label):
     accuracy=intersection/union
     presicion=intersection/pred[2]*pred[3]
     recall=intersection/label[2]*label[3]
-    f1_score=2*presicion*recall/(presicion+recall)
+    if (presicion + recall )== 0:
+        f1_score = 0
+    else:
+        f1_score = 2 * presicion * recall / (presicion + recall)
     IoU=intersection/union
     return accuracy,presicion,recall,f1_score, IoU
 #%%
