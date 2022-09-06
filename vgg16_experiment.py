@@ -18,9 +18,9 @@ import numpy as np
 from sklearn.model_selection import train_test_split
 from pre_process import augmented_cut, BB_Metrics
 shape = (256, 256)
-epochs = 20
+epochs = 25
 lr=5e-4
-df = pd.read_csv(r'/home/ubuntu/face_extraction/dataset_augmentations_linux.csv')
+df = pd.read_csv(r'/home/ubuntu/face_extraction/dataset1.csv')
 
 #%%
 for x in range(len(df)):
@@ -70,7 +70,7 @@ val = val.map(load_and_preprocess_from_path_label)
 # %%
 filter_size = (5, 5)
 maxpool_size = (2, 2)
-dr = 0.15
+dr = 0.1
 
 inputs = Input(shape=(shape[0], shape[1], 3), name='main_input')
 # MobileNetV3Small(input_shape=(inputs.s),include_top=False, weights='imagenet')(inputs)
@@ -126,8 +126,9 @@ cat_loss = tf.keras.losses.CategoricalCrossentropy(from_logits=False)
 mse_fn =tf.keras.losses.Huber ()
 optimizer = tf.keras.optimizers.Adam(learning_rate=lr)
 #%%
-wandb.init(project="preprocessing model1",config={"epochs":epochs,"shape":shape,"filter_size":filter_size,"maxpool_size":maxpool_size,"dr":dr
-                                                  ,"dataset":'unagumented'})
+wandb.init(project="preprocessing model",config={"epochs":epochs,"shape":shape,"filter_size":filter_size,"maxpool_size":maxpool_size,"dr":dr
+                                                  ,"dataset":'Unaugmented',
+                                                 'loss':'MSE'})
 name=wandb.run.name
 wandb.run.name='face _extraction_'+wandb.run.name
 #%%
@@ -215,43 +216,36 @@ model.save(r'/home/ubuntu/face_extraction/models/face_extraction-'+name+'.h5')
 #%%
 test = tf.data.Dataset.from_tensor_slices((test_filenames, test_labels))
 test = test.map(load_and_preprocess_from_path_label)
-test=test.batch(1)
+test=test.batch(10)
 test_landmarks_loss=0
 test_categorical_loss=0
 bb_metrics=BB_Metrics()
-table = wandb.Table(columns=['picture', 'landmarks loss', 'Class','Correct class','Accurately classified'])
-for step, (x_batch_test, y_batch_test) in enumerate(test):
-    landmarks, people_count = model(x_batch_test, training=False)
-
-    test_categorical_loss += cat_loss(y_batch_test[1], people_count)
-    test_people_accuracy(y_batch_test[1], people_count)
-    numpy_landmarks = np.array(landmarks)[0]
-    ground_truth = np.array(y_batch_test[0])[0]
-    fig,ax=plt.subplots(1,1)
-
-    class1=np.argmax(people_count)
-    correct_class=np.argmax(y_batch_test[1])
-    if (correct_class==0 or correct_class==2):
-        ax.imshow(x_batch_test.numpy()[0].astype(int))
+for step, (x_batch_val, y_batch_val) in enumerate(test):
+    print("Start of val %d" % (step,))
+    landmarks, people_count = model(x_batch_val, training=False)
+    empty = tf.zeros_like(landmarks)
+    booleans = tf.math.reduce_sum(tf.cast(empty == y_batch_val[0], dtype=tf.float32), axis=1) != 4
+    train_slice = tf.boolean_mask(y_batch_val[0], booleans)
+    train_landmarks = tf.boolean_mask(landmarks, booleans)
+    val_landmarks_loss = mse_fn(train_slice, train_landmarks)
+    val_categorical_loss = cat_loss(y_batch_val[1], people_count)
+    test_people_accuracy(y_batch_val[1], people_count)
+    bb_metrics.update(train_landmarks.numpy(), train_slice.numpy())
+    if step == 0:
+        combined_loss = val_landmarks_loss
     else:
-        bb_metrics.update(numpy_landmarks.reshape(1,4), ground_truth.reshape(1,4),True)
-        ax.imshow(x_batch_test.numpy()[0].astype(int))
-        ax.add_patch(plt.Rectangle((numpy_landmarks[0]*256,numpy_landmarks[1]*256)
-                                   ,(numpy_landmarks[2]*256),
-                                   (numpy_landmarks[3]*256),fill=False,edgecolor='r',linewidth=3))
-        ax.add_patch(plt.Rectangle((ground_truth[0]*256, ground_truth[1]*256), ground_truth[2]*256 , ground_truth[3]*256 , fill=False, edgecolor='blue', linewidth=3))
-        print('testing step:',step)
-        test_landmarks_loss += mse_fn(train_slice, train_landmarks)
+        combined_loss += val_landmarks_loss
+    wandb.log({'val landmarks loss': val_landmarks_loss,
+               'val  categorical loss': val_categorical_loss})
 
-        # fig.show()
-    table.add_data(wandb.Image(fig), float(test_landmarks_loss),class1,correct_class,class1==correct_class)
 
-wandb.log({'test landmarks loss': test_landmarks_loss,
-            'test categorical loss': test_categorical_loss})
+wandb.log({'test landmarks loss': combined_loss,
+            'test categorical loss': val_categorical_loss})
 wandb.log({'test people accuracy': test_people_accuracy.result()})
 wandb.log(bb_metrics.get_metrics('test_BB'))
 #%%
 model.save(r'home/ubuntu/face_extraction/models/face_extraction-'+name+'.h5')
 # wandb.log({'test table': table})
+wandb.save('/home/ubuntu/face_extraction/vgg16_experiment.py')
 wandb.finish()
 print(r'home/ubuntu/face_extraction/models/face_extraction-'+name+'.h5')

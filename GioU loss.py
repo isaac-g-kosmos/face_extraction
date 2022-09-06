@@ -21,7 +21,7 @@ from pre_process import augmented_cut, BB_Metrics
 shape = (256, 256)
 epochs = 25
 lr=2.5e-4
-df = pd.read_csv(r'/home/ubuntu/face_extraction/dataset_augmentations_linux.csv')
+df = pd.read_csv(r'/home/ubuntu/face_extraction/dataset1.csv')
 
 #%%
 for x in range(len(df)):
@@ -138,13 +138,14 @@ model.summary()
 ds = ds.batch(10)
 val = val.batch(10)
 cat_loss = tf.keras.losses.CategoricalCrossentropy(from_logits=False)
-giou_loss = tfa.losses.GIoULoss('iou')
+giou_loss = tfa.losses.GIoULoss('giou')
 optimizer = tf.keras.optimizers.Adam(learning_rate=lr)
 mse_fn = tf.keras.losses.MeanSquaredError()
 
 # #%%
 wandb.login(key= 'fbfab062554223a1f88a2bb48ba99ea5254df982' )
-wandb.init(project="preprocessing model",config={"epochs":epochs,"shape":shape,"filter_size":filter_size,"maxpool_size":maxpool_size,"dr":dr})
+wandb.init(project="preprocessing model",config={"epochs":epochs,"shape":shape,"filter_size":filter_size,"maxpool_size":maxpool_size,"dr":dr,
+                                                 'loss':'GIOU'})
 name=wandb.run.name
 wandb.run.name='face _extraction_'+wandb.run.name
 #%%
@@ -192,13 +193,12 @@ for epoch in range(epochs):
             wandb.log({'landmarks loss': landmarks_loss})
 
             wandb.log({'categorical loss': categorical_loss})
-            if epoch==0:
+            if epoch<5:
                 grads = tape.gradient([landmarks_loss,
                                        categorical_loss],
                                       model.trainable_weights)
             else:
-                grads = tape.gradient([landmarks_loss,
-                                       categorical_loss*.1,
+                grads = tape.gradient([categorical_loss,
                                        giou_los],
                                       model.trainable_weights)
 
@@ -278,4 +278,5 @@ wandb.log(bb_metrics.get_metrics('test_BB'))
 #%%
 model.save(r'/home/ubuntu/face_extraction/models/face_extraction-'+name+'.h5')
 # wandb.log({'test table': table})
+wandb.save('/home/ubuntu/face_extraction/GioU loss.py')
 wandb.finish()
