@@ -1,9 +1,7 @@
 from tensorflow.keras.models import Model
 from tensorflow.keras.layers import Input, Conv2D, Dense, GlobalMaxPooling2D
-
 from tensorflow.keras.applications import VGG16
 from keras.models import Model, load_model
-
 import tensorflow as tf
 from keras.models import Model
 from keras.layers import Input, Dense, Dropout, Activation, Flatten
@@ -80,29 +78,29 @@ plt.show()
 # slice=image[int(landmarks[0]):int(landmarks[0])+int(landmarks[3]),int(landmarks[1]):int(landmarks[1])+int(landmarks[2])]
 # plt.imshow(slice)
 # plt.show()
-#%%
-path=r'C:\Users\isaac\PycharmProjects\tensorflow_filter\lfw_5590'
-files=os.listdir(path)
-files=[os.path.join(path,x) for x in files]
-path=files[random.randint(0,len(files))]
-image=load_and_preprocess_image(path)
-image=tf.expand_dims(image,0)
-
-landmarks,preds=model(image,training=False)
-
-print(landmarks)
-from PIL import Image
-landmarks=np.array(landmarks[0])*256
-
-fig,ax=plt.subplots(1)
-image=Image.open(path)
-image=image.resize((256,256))
-image=np.array(image)
-ax.imshow(image)
-
+# #%%
+# path=r'C:\Users\isaac\PycharmProjects\tensorflow_filter\lfw_5590'
+# files=os.listdir(path)
+# files=[os.path.join(path,x) for x in files]
+# path=files[random.randint(0,len(files))]
+# image=load_and_preprocess_image(path)
+# image=tf.expand_dims(image,0)
+#
+# landmarks,preds=model(image,training=False)
+#
+# print(landmarks)
+# from PIL import Image
+# landmarks=np.array(landmarks[0])*256
+#
+# fig,ax=plt.subplots(1)
+# image=Image.open(path)
+# image=image.resize((256,256))
+# image=np.array(image)
+# ax.imshow(image)
+#
 # ax.add_patch(plt.Rectangle((landmarks[1],landmarks[0]),landmarks[2],landmarks[3],fill=False,edgecolor='blue',linewidth=3))
 # plt.show()
 #
-slice=image[int(landmarks[0]):int(landmarks[0])+int(landmarks[3]),int(landmarks[1]):int(landmarks[1])+int(landmarks[2])]
-plt.imshow(slice)
-plt.show()
+# # slice=image[int(landmarks[0]):int(landmarks[0])+int(landmarks[3]),int(landmarks[1]):int(landmarks[1])+int(landmarks[2])]
+# # plt.imshow(slice)
+# # plt.show()
