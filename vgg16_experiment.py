@@ -19,8 +19,8 @@ from sklearn.model_selection import train_test_split
 from pre_process import augmented_cut, BB_Metrics
 shape = (256, 256)
 epochs = 25
-lr=5e-4
-df = pd.read_csv(r'/home/ubuntu/face_extraction/dataset1.csv')
+lr=1e-3
+df = pd.read_csv(r'/home/ubuntu/face_extraction/dataset_augmentations_linux.csv')
 
 #%%
 for x in range(len(df)):
@@ -70,7 +70,7 @@ val = val.map(load_and_preprocess_from_path_label)
 # %%
 filter_size = (5, 5)
 maxpool_size = (2, 2)
-dr = 0.1
+dr = 0.5
 
 inputs = Input(shape=(shape[0], shape[1], 3), name='main_input')
 # MobileNetV3Small(input_shape=(inputs.s),include_top=False, weights='imagenet')(inputs)
@@ -78,25 +78,38 @@ vgg = MobileNetV3Small(include_top=False)(inputs)
 #[4, 8, 8, 576]
 vgg.trainable = False
 #flatten
-
-classification = Conv2D(180, kernel_size=(5, 5), padding="valid")(vgg)
+classification=tf.keras.layers.ZeroPadding2D(padding=1)(vgg)
+classification = Conv2D(180, kernel_size=(5, 5), padding="valid")(classification)
+classification = Activation("LeakyReLU")(classification)
+classification = MaxPooling2D(pool_size=(2, 2))(classification)
+classification=tf.keras.layers.ZeroPadding2D(padding=1)(classification)
+classification = Conv2D(180, kernel_size=(3, 3), padding="valid")(classification)
 classification = Activation("LeakyReLU")(classification)
 classification = MaxPooling2D(pool_size=(2, 2))(classification)
 classification = Flatten()(classification)
+classification = Dense(480, activation=tf.keras.layers.LeakyReLU())(classification)
+classification = Dropout(.2)(classification)
 classification = Dense(256, activation=tf.keras.layers.LeakyReLU())(classification)
-classification = Dropout(dr)(classification)
+classification = Dropout(.2)(classification)
 classification = Dense(128, activation=tf.keras.layers.LeakyReLU())(classification)
-classification = Dropout(dr)(classification)
+classification = Dropout(.2)(classification)
 classification = Dense(64, activation=tf.keras.layers.LeakyReLU())(classification)
-classification = Dropout(dr)(classification)
+classification = Dropout(.2)(classification)
 classification = Dense(32, activation=tf.keras.layers.LeakyReLU())(classification)
-classification = Dropout(dr)(classification)
+classification = Dropout(.2)(classification)
 classification = Dense(3, activation='softmax')(classification)
 
-regression = Conv2D(180, kernel_size=(5, 5), padding="valid")(vgg)
+regression=tf.keras.layers.ZeroPadding2D(padding=1)(vgg)
+regression = Conv2D(560, kernel_size=(3, 3), padding="valid")(regression)
+regression = Activation("LeakyReLU")(regression)
+regression = MaxPooling2D(pool_size=(2, 2))(regression)
+regression=tf.keras.layers.ZeroPadding2D(padding=1)(regression)
+regression = Conv2D(500, kernel_size=(3, 3), padding="valid")(regression)
 regression = Activation("LeakyReLU")(regression)
 regression = MaxPooling2D(pool_size=(2, 2))(regression)
 regression = Flatten()(regression)
+regression = Dense(540, activation=tf.keras.layers.LeakyReLU())(regression)
+regression = Dropout(dr)(regression)
 regression = Dense(256, activation=tf.keras.layers.LeakyReLU())(regression)
 regression = Dropout(dr)(regression)
 regression = Dense(128, activation=tf.keras.layers.LeakyReLU())(regression)
@@ -123,11 +136,12 @@ model.summary()
 ds = ds.batch(10)
 val = val.batch(10)
 cat_loss = tf.keras.losses.CategoricalCrossentropy(from_logits=False)
-mse_fn =tf.keras.losses.Huber ()
+# mse_fn =tf.keras.losses.Huber ()
+mse_fn =tf.keras.losses.MeanSquaredError()
 optimizer = tf.keras.optimizers.Adam(learning_rate=lr)
 #%%
 wandb.init(project="preprocessing model",config={"epochs":epochs,"shape":shape,"filter_size":filter_size,"maxpool_size":maxpool_size,"dr":dr
-                                                  ,"dataset":'Unaugmented',
+                                                  ,"dataset":'Augmented',
                                                  'loss':'MSE'})
 name=wandb.run.name
 wandb.run.name='face _extraction_'+wandb.run.name
