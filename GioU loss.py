@@ -168,8 +168,8 @@ for epoch in range(epochs):
     # Iterate over the batches of the dataset.
     for step, (x_batch_train, y_batch_train) in enumerate(ds):
         # Open a GradientTape to record the operations run
-        if step%500
-        # print("Start of iteration %d" % (step,))
+        if step%500==0:
+            print("Start of iteration %d" % (step,))
         # during the forward pass, which enables auto-differentiation.
         with tf.GradientTape() as tape:
             tape.watch(x_batch_train)
@@ -212,7 +212,7 @@ for epoch in range(epochs):
                                        giou_los],
                                       model.trainable_weights)
 
-# Run one step of gradient descent by updating
+            # Run one step of gradient descent by updating
             # the value of the variables to minimize the loss.
             optimizer.apply_gradients(zip(grads, model.trainable_weights))
 
@@ -222,8 +222,8 @@ for epoch in range(epochs):
     wandb.log({'Train combined loss': combined_loss})
     wandb.log({'Train accuracy': train_people_accuracy.result()})
 
+    print("Start of val")
     for step, (x_batch_val, y_batch_val) in enumerate(val):
-        print("Start of val %d" % (step,))
         landmarks, people_count = model(x_batch_val, training=False)
         empty = tf.zeros_like(landmarks)
         booleans = tf.math.reduce_sum(tf.cast(empty == y_batch_val[0], dtype=tf.float32), axis=1) != 4
