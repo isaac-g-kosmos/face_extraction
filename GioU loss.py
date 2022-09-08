@@ -19,9 +19,9 @@ import numpy as np
 from sklearn.model_selection import train_test_split
 from pre_process import augmented_cut, BB_Metrics
 shape = (256, 256)
-epochs = 25
-lr=2.5e-4
-df = pd.read_csv(r'/home/ubuntu/face_extraction/dataset1.csv')
+epochs = 50
+lr=1e-4
+df = pd.read_csv(r'/home/ubuntu/face_extraction/dataset_augmentations_linux.csv')
 
 #%%
 for x in range(len(df)):
@@ -84,25 +84,38 @@ vgg = MobileNetV3Small(include_top=False)(inputs)
 #[4, 8, 8, 576]
 vgg.trainable = False
 #flatten
-
-classification = Conv2D(180, kernel_size=(5, 5), padding="valid")(vgg)
+classification=tf.keras.layers.ZeroPadding2D(padding=1)(vgg)
+classification = Conv2D(180, kernel_size=(5, 5), padding="valid")(classification)
+classification = Activation("LeakyReLU")(classification)
+classification = MaxPooling2D(pool_size=(2, 2))(classification)
+classification=tf.keras.layers.ZeroPadding2D(padding=1)(classification)
+classification = Conv2D(180, kernel_size=(3, 3), padding="valid")(classification)
 classification = Activation("LeakyReLU")(classification)
 classification = MaxPooling2D(pool_size=(2, 2))(classification)
 classification = Flatten()(classification)
+classification = Dense(480, activation=tf.keras.layers.LeakyReLU())(classification)
+classification = Dropout(.2)(classification)
 classification = Dense(256, activation=tf.keras.layers.LeakyReLU())(classification)
-classification = Dropout(dr)(classification)
+classification = Dropout(.2)(classification)
 classification = Dense(128, activation=tf.keras.layers.LeakyReLU())(classification)
-classification = Dropout(dr)(classification)
+classification = Dropout(.2)(classification)
 classification = Dense(64, activation=tf.keras.layers.LeakyReLU())(classification)
-classification = Dropout(dr)(classification)
+classification = Dropout(.2)(classification)
 classification = Dense(32, activation=tf.keras.layers.LeakyReLU())(classification)
-classification = Dropout(dr)(classification)
+classification = Dropout(.2)(classification)
 classification = Dense(3, activation='softmax')(classification)
 
-regression = Conv2D(180, kernel_size=(5, 5), padding="valid")(vgg)
+regression=tf.keras.layers.ZeroPadding2D(padding=1)(vgg)
+regression = Conv2D(560, kernel_size=(3, 3), padding="valid")(regression)
+regression = Activation("LeakyReLU")(regression)
+regression = MaxPooling2D(pool_size=(2, 2))(regression)
+regression=tf.keras.layers.ZeroPadding2D(padding=1)(regression)
+regression = Conv2D(500, kernel_size=(3, 3), padding="valid")(regression)
 regression = Activation("LeakyReLU")(regression)
 regression = MaxPooling2D(pool_size=(2, 2))(regression)
 regression = Flatten()(regression)
+regression = Dense(540, activation=tf.keras.layers.LeakyReLU())(regression)
+regression = Dropout(dr)(regression)
 regression = Dense(256, activation=tf.keras.layers.LeakyReLU())(regression)
 regression = Dropout(dr)(regression)
 regression = Dense(128, activation=tf.keras.layers.LeakyReLU())(regression)
@@ -113,10 +126,6 @@ regression = Dense(32, activation=tf.keras.layers.LeakyReLU())(regression)
 regression = Dropout(dr)(regression)
 regression = Dense(16, activation=tf.keras.layers.LeakyReLU())(regression)
 regression = Dense(4, activation=tf.keras.layers.LeakyReLU())(regression)
-
-
-
-
 
 model = Model(inputs=inputs,
               outputs=[regression,
@@ -145,7 +154,7 @@ mse_fn = tf.keras.losses.MeanSquaredError()
 # #%%
 wandb.login(key= 'fbfab062554223a1f88a2bb48ba99ea5254df982' )
 wandb.init(project="preprocessing model",config={"epochs":epochs,"shape":shape,"filter_size":filter_size,"maxpool_size":maxpool_size,"dr":dr,
-                                                 'loss':'GIOU'})
+                                                 'loss':'GIOU','lr':lr})
 name=wandb.run.name
 wandb.run.name='face _extraction_'+wandb.run.name
 #%%
@@ -159,6 +168,7 @@ for epoch in range(epochs):
     # Iterate over the batches of the dataset.
     for step, (x_batch_train, y_batch_train) in enumerate(ds):
         # Open a GradientTape to record the operations run
+        if step%500
         # print("Start of iteration %d" % (step,))
         # during the forward pass, which enables auto-differentiation.
         with tf.GradientTape() as tape:
@@ -174,7 +184,7 @@ for epoch in range(epochs):
             booleans=tf.math.reduce_sum(tf.cast(empty == y_batch_train[0], dtype=tf.float32), axis=1) != 4
             train_slice=tf.boolean_mask(y_batch_train[0],booleans)
             train_landmarks=tf.boolean_mask(landmarks,booleans)
-            if epoch == 0:
+            if epoch <9:
                 landmarks_loss =mse_fn(train_slice, train_landmarks)
             else:
                 landmarks_loss = mse_fn(train_slice, train_landmarks)
@@ -186,14 +196,14 @@ for epoch in range(epochs):
             categorical_loss = cat_loss(y_batch_train[1], people_count)
             train_people_accuracy(y_batch_train[1], people_count)
             bb_metrics.update(train_landmarks.numpy(),train_slice.numpy())
-            if step == 0:
+            if step < 9:
                 combined_loss = landmarks_loss
             else:
                 combined_loss += landmarks_loss
             wandb.log({'landmarks loss': landmarks_loss})
 
             wandb.log({'categorical loss': categorical_loss})
-            if epoch<5:
+            if epoch<9:
                 grads = tape.gradient([landmarks_loss,
                                        categorical_loss],
                                       model.trainable_weights)

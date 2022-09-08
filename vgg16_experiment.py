@@ -18,8 +18,8 @@ import numpy as np
 from sklearn.model_selection import train_test_split
 from pre_process import augmented_cut, BB_Metrics
 shape = (256, 256)
-epochs = 25
-lr=1e-3
+epochs = 35
+lr=1e-5
 df = pd.read_csv(r'/home/ubuntu/face_extraction/dataset_augmentations_linux.csv')
 
 #%%
@@ -136,8 +136,8 @@ model.summary()
 ds = ds.batch(10)
 val = val.batch(10)
 cat_loss = tf.keras.losses.CategoricalCrossentropy(from_logits=False)
-# mse_fn =tf.keras.losses.Huber ()
-mse_fn =tf.keras.losses.MeanSquaredError()
+mse_fn =tf.keras.losses.Huber ()
+# mse_fn =tf.keras.losses.MeanSquaredError()
 optimizer = tf.keras.optimizers.Adam(learning_rate=lr)
 #%%
 wandb.init(project="preprocessing model",config={"epochs":epochs,"shape":shape,"filter_size":filter_size,"maxpool_size":maxpool_size,"dr":dr

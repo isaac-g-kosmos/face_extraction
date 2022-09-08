@@ -53,6 +53,7 @@ def augmented_cut(pic_width, pic_height, top, left, width, height, leeway=0):
 
 #%%
 def bb_box_metrics(pred,label):
+    #cordinates x1,y1,y2,y2
     #calculate the intesection of abounding box
     x1=max(pred[0],label[0])
     y1=max(pred[1],label[1])
@@ -64,11 +65,11 @@ def bb_box_metrics(pred,label):
         intersection=(x2-x1)*(y2-y1)
 
     #calculate the union of abounding box
-    union=(pred[2]*pred[3])+(label[2]*label[3])-intersection
+    union=(pred[0]-pred[2])*(pred[1]-pred[3])+(label[0]-label[2])*(label[1]-label[3])-intersection
     #calculate the IoU
     accuracy=intersection/union
-    presicion=intersection/pred[2]*pred[3]
-    recall=intersection/label[2]*label[3]
+    presicion=intersection/((pred[2]-pred[0])*(pred[3]-pred[1]))
+    recall=intersection/((label[2]-label[0])*(label[3]-label[1]))
     if (presicion+recall)==0:
         f1_score=0
     else:
@@ -90,8 +91,8 @@ def bb_box_metrics_extension(pred,label):
     union=(pred[2]*pred[3])+(label[2]*label[3])-intersection
     #calculate the IoU
     accuracy=intersection/union
-    presicion=intersection/pred[2]*pred[3]
-    recall=intersection/label[2]*label[3]
+    presicion=intersection/(pred[2]*pred[3])
+    recall=intersection/(label[2]*label[3])
     if (presicion + recall )== 0:
         f1_score = 0
     else:
